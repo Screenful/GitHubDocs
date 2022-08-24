@@ -4,7 +4,11 @@ Documentation for the Screenful GitHub integration
 
 ## How to: authorise GitHub so that Screenful has only read-only access
 
-Assumption: some experience with [terraform infrastructure as code][1].
+### Pre-requisites: 
+
+- some experience with [terraform infrastructure as code][1] applied to github.
+
+### How-to
 
 1. Create a new bot/service-account github user via github signup.
     - note: the bot/service-account should have only `pull` access to repositories. If you have an existing bot you can re-use, you can. Be aware of privilege escalation for that user. 
@@ -23,35 +27,42 @@ Assumption: some experience with [terraform infrastructure as code][1].
     ```terraform
     resource "github_team" "bots-readonly" {
       name       = "bots-readonly"
-      depends_on = [
-        github_membership.bot
-      ]
     }
     ```
 
 4. Configure terraform `github_team_membership` to place the user in the team:
 
     ```terraform
-    resource "github_team_membership" "some_team_membership" {
+    resource "github_team_membership" "bot-is-member-of-bots-readonly" {
       team_id  = github_team.bots-readonly.id
       username = github_membership.bot.username
       role     = "member"
     }
     ```
 
-5. Configure terraform `github_team_repository` to grant read-only access to the team to the repositories you want to wire up:
+5. Configure `n` `github_repository` resources to grant access to via team/repo linkage (in next step):
 
     ```terraform
-    resource "github_team_repository" "some_team_repo" {
-      team_id    = github_team.some_team.id
-      repository = github_repository.some_repo.name
+    resource "github_repository" "some-repo" {
+      name = "..."
+      # ...
+    }
+    ```
+
+6. Configure terraform `github_team_repository` to grant read-only access to the team to the repositories you want to wire up:
+
+    ```terraform
+    resource "github_team_repository" "bots-readonly-can-pull-from-some-repo" {
+      team_id    = github_team.bots-readonly.id
+      repository = github_repository.some-repo.name
       permission = "pull"
     }
+    # ... n times, 1 per repo
     ```
 
 6. `terraform apply`, and `yes` if the changes look good to you.
 7. as the bot, sign up to screenful.com
-8. as a github org-admin, accept the invite
+8. as a github org-admin, accept the invite - <https://github.com/organizations/ORG_NAME/settings/oauth_application_policy>
 9. as the bot in screenful, add github data source(s)
 
 ### Caveats
